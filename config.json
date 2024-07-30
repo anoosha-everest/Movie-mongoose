@@ -1,0 +1,5 @@
+{
+    "movieDataPath": "csv_files/movies.csv",
+    "criticReviewDataPath":"csv_files/critic_reviews.csv",
+    "userReviewDataPath":"csv_files/user_reviews.csv"
+  }
