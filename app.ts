@@ -7,16 +7,21 @@ import * as fs from 'fs';
 import csvParser from 'csv-parser';
 import path from 'path';
 
-nconf.file('config', { file: path.resolve(__dirname, 'config.json') });
 
+nconf.file('config', { file: path.resolve(__dirname, 'config.json') });
+let row:any=0;
+let resol:any=0;
 async function readCSVMovies(filePath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const fileStream = fs.createReadStream(filePath);
     const csvStream = csvParser();
-    fileStream
-      .pipe(csvStream)
+    let processing = false;
+    const csvPipe = fileStream.pipe(csvStream)
+    csvPipe
       .on('data', async (data: any) => {
+        csvPipe.pause();
         try {
+          processing = true;
           await Movie.findOneAndUpdate(
             { movieTitle: data.movieTitle }, 
             data,
@@ -24,6 +29,10 @@ async function readCSVMovies(filePath: string): Promise<void> {
           );
         } catch (err) {
           console.error('Error updating/inserting document:', err);
+        }
+        finally {
+          csvPipe.resume();
+          processing = false;
         }
       })
       .on('end', () => {
@@ -41,10 +50,13 @@ async function readCSVCritics(filePath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const fileStream = fs.createReadStream(filePath);
     const csvStream = csvParser();
-    fileStream
-      .pipe(csvStream)
+    let processing = false;
+    const csvPipe = fileStream.pipe(csvStream);
+    csvPipe
       .on('data', async (data: any) => {
+        csvPipe.pause();
         try {
+          processing = true;
           const movie = await Movie.findOne({ movieId: data.movieId });
           if (!movie) {
             throw new Error(`Movie with movieId ${data.movieId} not found`);
@@ -74,6 +86,10 @@ async function readCSVCritics(filePath: string): Promise<void> {
         } catch (err) {
           console.error('Error updating/inserting document:', err);
         }
+        finally {
+          csvPipe.resume();
+          processing = false;
+        }
       })
       .on('end', () => {
         console.log('Critics data has been processed and inserted/updated in the database');
@@ -90,10 +106,13 @@ async function readCSVUsers(filePath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const fileStream = fs.createReadStream(filePath);
     const csvStream = csvParser();
-    fileStream
-      .pipe(csvStream)
+    let processing = false;
+    const csvPipe = fileStream.pipe(csvStream);
+    csvPipe
       .on('data', async (data: any) => {
+        csvPipe.pause();
         try {
+          processing = true;
           const movie = await Movie.findOne({ movieId: data.movieId });
           if (!movie) {
             throw new Error(`Movie with movieId ${data.movieId} not found`);
@@ -113,21 +132,16 @@ async function readCSVUsers(filePath: string): Promise<void> {
             userId:data.userId,
           }
           await User.findOneAndUpdate(
-            { movieId: user.movieId ,userId:user.userId,rating:user.rating,
-              reviewId:user.reviewId,
-              isVerified:user.isVerified,
-              isSuperReviewer:user.isSuperReviewer,
-              hasSpoilers:user.hasSpoilers,
-              hasProfanity:user.hasProfanity,
-              score:user.score,
-              creationDate:user.creationDate,
-              userDisplayName:user.userDisplayName,
-              userRealm:user.userRealm},
+            { movieId: user.movieId ,userId:user.userId},
             user,
             { upsert: true, new: true }  // Insert if not exists, update if exists
           );
         } catch (err) {
           console.error('Error updating/inserting document:', err);
+        }
+        finally {
+          csvPipe.resume();
+          processing = false;
         }
       })
       .on('end', () => {
@@ -207,8 +221,8 @@ const connectToDatabase = async (): Promise<void> => {
     if (!userDataPath) {
       throw new Error('userDataPath must be specified in the config file');
     }
-    // await User.deleteMany();
-    // await readCSVUsers(userDataPath);
+    await User.deleteMany();
+    await readCSVUsers(userDataPath);
     console.log("Inserted Users"); 
     const mov="The Philadelphia Story";
     const id:any=await Movie.find({movieTitle:mov});
