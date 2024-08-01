@@ -131,11 +131,7 @@ async function readCSVUsers(filePath: string): Promise<void> {
             userRealm:data.userRealm,
             userId:data.userId,
           }
-          await User.findOneAndUpdate(
-            { movieId: user.movieId ,userId:user.userId},
-            user,
-            { upsert: true, new: true }  // Insert if not exists, update if exists
-          );
+          await User.create(user);
         } catch (err) {
           console.error('Error updating/inserting document:', err);
         }
@@ -225,11 +221,11 @@ const connectToDatabase = async (): Promise<void> => {
     await readCSVUsers(userDataPath);
     console.log("Inserted Users"); 
     const mov="The Philadelphia Story";
-    const id:any=await Movie.find({movieTitle:mov});
-     const anu=id[0]._id;
+    const doc:any=await Movie.findOne({movieTitle:mov});
+     const id=doc._id;
     const ratingFrequencies = await Critic.aggregate([
       {
-        $match: { movieId: anu }},
+        $match: { movieId: id }},
       {
         $group: {
           _id: '$originalScore',
@@ -247,6 +243,7 @@ const connectToDatabase = async (): Promise<void> => {
         $sort: { rating: 1 }
       }
     ]);
+
     console.log(`${mov} Rating Frequencies:`,ratingFrequencies);
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
