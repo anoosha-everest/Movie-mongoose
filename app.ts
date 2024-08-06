@@ -203,22 +203,22 @@ const connectToDatabase = async (): Promise<void> => {
     if (!movieDataPath) {
       throw new Error('movieDataPath must be specified in the config file');
     }
-    await Movie.deleteMany();
-    await readCSVMovies(movieDataPath);
+    // await Movie.deleteMany();
+    // await readCSVMovies(movieDataPath);
     console.log("inserted movies");
     const criticDataPath = nconf.get('criticReviewDataPath');
     if (!criticDataPath) {
       throw new Error('criticDataPath must be specified in the config file');
     }
-    await Critic.deleteMany();
-    await readCSVCritics(criticDataPath);
+    // await Critic.deleteMany();
+    // await readCSVCritics(criticDataPath);
     console.log("Inserted Critics");  
     const userDataPath = nconf.get('userReviewDataPath');
     if (!userDataPath) {
       throw new Error('userDataPath must be specified in the config file');
     }
-    await User.deleteMany();
-    await readCSVUsers(userDataPath);
+    // await User.deleteMany();
+    // await readCSVUsers(userDataPath);
     console.log("Inserted Users"); 
     const mov="The Philadelphia Story";
     const doc:any=await Movie.findOne({movieTitle:mov});
@@ -245,6 +245,93 @@ const connectToDatabase = async (): Promise<void> => {
     ]);
 
     console.log(`${mov} Rating Frequencies:`,ratingFrequencies);
+    
+    const topCriticDetails = await Critic.aggregate([
+      {
+        $lookup: {
+          from: "movies",
+          localField: "movieId",
+          foreignField: "_id",
+          as: "movieDetails"
+        }
+      },
+      {
+        $unwind: "$movieDetails" 
+      },
+      {
+        $sort: { originalScore: -1 } 
+      },
+      {
+        $group: {
+          _id: "$movieId",
+          highestRating: { $first: "$originalScore" },
+          reviewId: { $first: "$reviewId" },
+          criticName: { $first: "$criticName" }, 
+          movieTitle: { $first: "$movieDetails.movieTitle" }
+        }
+      },
+      {
+        $sort: { highestRating: -1 } 
+      },
+      {
+        $limit: 1
+      }
+    ]);
+    
+    console.log("Top critic details:", topCriticDetails);
+    
+    // const highestRatedMovie = await User.aggregate([
+    //   {
+    //     $group: {
+    //       _id: '$movieId', 
+    //       averageRating: { $avg: { $toDouble: '$rating' } } 
+    //     }
+    //   },
+    //  { $sort: { averageRating: -1 } }, 
+    //   { $limit: 1 } 
+    // ]);
+    // console.log("highest rated movie",highestRatedMovie);
+
+    const highestRatedMovieDetails = await User.aggregate([
+      {
+        $lookup: {
+          from: 'movies',
+          localField: 'movieId',
+          foreignField: '_id',
+          as: 'movieDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: '$movieDetails',
+        }
+      },
+      {
+        $group: {
+          _id: '$movieId',
+          movieTitle: { $first: '$movieDetails.movieTitle' }, 
+          averageRating: { $avg: { $toDouble: '$rating' } } 
+        }
+      },
+      {
+        $sort: { averageRating: -1 }
+      },
+      {
+        $limit: 1
+      },
+      {
+        $project: {
+          _id: 0, 
+          movieId: '$_id', 
+          averageRating: 1, 
+          movieTitle: 1 
+        }
+      }
+    ]);
+    
+    console.log("Highest rated movie with details:", highestRatedMovieDetails);
+    
+     
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
   }
